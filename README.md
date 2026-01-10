@@ -202,16 +202,30 @@ OpenFeature.setProvider(
 export const flagrAdapter = createOpenFeatureAdapter(OpenFeature.getClient());
 ```
 
-```typescript
-// flags.ts
-import { flag } from 'flags/next';
-import { flagrAdapter } from './lib/flags';
 
-export const showNewFeature = flag({
-  key: 'show-new-feature',
-  defaultValue: false,
-  adapter: flagrAdapter.booleanValue(),
-});
+#### Pages Router
+```typescript
+// page.ts
+import {flag} from 'flags/next';
+import {flagrAdapter} from './lib/flags';
+
+const EXAMPLE_BOOLEAN_FLAG_KEY = 'example-boolean-flag';
+
+export const getServerSideProps = (async ({req}) => {
+    const exampleFlag = await featureClient.getBooleanValue(EXAMPLE_BOOLEAN_FLAG_KEY, false);
+    return {props: {example}};
+}) satisfies GetServerSideProps<{ example: boolean }>;
+
+
+export default async function Page() {
+    return (
+        <>
+            Exampleflag is {exampleFlag : "enabled":"disabled"}
+        </>
+    );
+}
+
+
 ```
 
 ### Direct SDK Usage (Server Components, API Routes)
