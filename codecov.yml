@@ -1,4 +1,4 @@
 coverage:
-    ignore:
-        - "src/__tests__/**"
-    range: 50..78
+  ignore:
+    - 'src/__tests__/**'
+  range: 50..78
