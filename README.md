@@ -235,6 +235,7 @@ export default async function Page() {
 - **Server-only**: This provider uses remote evaluation (HTTP calls), making it unsuitable for client-side usage
 - **No push updates**: Flagr doesn't provide webhooks for flag changes, so `PROVIDER_CONFIGURATION_CHANGED` events are not emitted
 - **Edge Runtime**: Not compatible with Edge Runtime (requires Node.js HTTP)
+- **No Batch Evaluation**: OpenFeature doesn't support batch evaluation. This is something I want to add within the provider initialiser
 
 ## License
 
