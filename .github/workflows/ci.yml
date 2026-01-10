@@ -1,0 +1,78 @@
+name: ci
+
+on:
+    push:
+        branches: [ 'main' ]
+    pull_request:
+
+jobs:
+    lint:
+        runs-on: ubuntu-latest
+        steps:
+            -   uses: actions/checkout@v4
+            -   uses: actions/setup-node@v4
+                with:
+                    node-version: '20'
+                    cache: 'npm'
+            -   run: npm ci
+            -   run: npm run lint
+            -   run: npm run format:check
+
+    typecheck:
+        runs-on: ubuntu-latest
+        steps:
+            -   uses: actions/checkout@v4
+            -   uses: actions/setup-node@v4
+                with:
+                    node-version: '24'
+                    cache: 'npm'
+            -   run: npm ci
+            -   run: npm run typecheck
+
+    unit_test:
+        runs-on: ubuntu-latest
+        steps:
+            -   uses: actions/checkout@v4
+            -   uses: actions/setup-node@v4
+                with:
+                    node-version: '24'
+                    cache: 'npm'
+            -   run: npm ci
+            -   run: npm run test:unit
+            -   uses: codecov/codecov-action@v4
+                with:
+                    token: ${{ secrets.CODECOV_TOKEN }}
+
+#    integration_test:
+#        runs-on: ubuntu-latest
+#        steps:
+#            -   uses: actions/checkout@v4
+#            -   uses: actions/setup-node@v4
+#                with:
+#                    node-version: '24'
+#                    cache: 'npm'
+#            -   run: npm ci
+#            -   run: npm run test:integration
+
+    build:
+        runs-on: ubuntu-latest
+        steps:
+            -   uses: actions/checkout@v4
+            -   uses: actions/setup-node@v4
+                with:
+                    node-version: '24'
+                    cache: 'npm'
+            -   run: npm ci
+            -   run: npm run build
+
+    actionlint:
+        runs-on: ubuntu-latest
+        steps:
+            -   uses: actions/checkout@v4
+            -   name: Download actionlint
+                id: get_actionlint
+                run: bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+                shell: bash
+            -   name: Check workflow files
+                run: ${{ steps.get_actionlint.outputs.executable }} -color
+                shell: bash
