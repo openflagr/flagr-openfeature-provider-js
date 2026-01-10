@@ -1,5 +1,8 @@
 # flagr-openfeature-provider-js
 
+> [!NOTE]  
+> The repository is still under development. The NPM package is not yet published.
+
 [OpenFeature](https://openfeature.dev/) provider for [Flagr](https://openflagr.github.io/flagr/) feature flagging service.
 
 ## Quick Start
