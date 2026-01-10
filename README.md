@@ -6,7 +6,7 @@
 
 ```typescript
 import { OpenFeature } from '@openfeature/server-sdk';
-import { FlagrProvider } from '@`openflagr/flagr-openfeature-provider-js`';
+import { FlagrProvider } from '@openflagr/flagr-openfeature-provider-js';
 
 // Initialize the provider
 OpenFeature.setProvider(
@@ -190,7 +190,7 @@ await OpenFeature.close();
 // lib/flags.ts
 import { createOpenFeatureAdapter } from '@flags-sdk/openfeature';
 import { OpenFeature } from '@openfeature/server-sdk';
-import { FlagrProvider } from '@goodpie/openfeature-flagr-provider';
+import { FlagrProvider } from 'openflagr/flagr-openfeature-provider-js';
 
 OpenFeature.setProvider(
   new FlagrProvider({
