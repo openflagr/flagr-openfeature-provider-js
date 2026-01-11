@@ -25,7 +25,7 @@ import { evaluateFlag } from './evaluateFlag';
  * @example
  * ```typescript
  * import { OpenFeature } from '@openfeature/server-sdk';
- * import { FlagrProvider } from '@goodpie/openfeature-flagr-provider';
+ * import { FlagrProvider } from '@flagr/flagr-openfeature-provider-js';
  *
  * OpenFeature.setProvider(new FlagrProvider({
  *   baseUrl: 'http://localhost:18000',
