@@ -1,7 +1,7 @@
 {
-  "name": "@goodpie/openfeature-flagr-provider",
-  "version": "1.0.0",
-  "description": "OpenFeature provider for Flagr feature flagging service",
+  "name": "@flagr/flagr-openfeature-provider-js",
+  "version": "0.0.1",
+  "description": "Flagr OpenFeature provider",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
@@ -61,7 +61,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/goodpie/openfeature-flagr-provider"
+    "url": "https://github.com/openflagr/flagr-openfeature-provider-js"
   },
-  "license": "MIT"
+  "license": "Apache-2.0"
 }
