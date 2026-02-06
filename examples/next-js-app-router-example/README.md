@@ -24,10 +24,10 @@ The seed script creates four flags that cover every OpenFeature evaluation type:
 
 | Flag Key | Type | Method | Default Variant | Description |
 |---|---|---|---|---|
-| `example-dark-mode` | boolean | `getBooleanValue` | `on` (100%) | Toggles a dark/light card |
-| `example-greeting` | string | `getStringValue` | `hello` (100%) | Maps variant to greeting text |
-| `example-items-per-page` | number | `getNumberValue` | `25` (100%) | Controls skeleton row count |
-| `example-ui-config` | object | `getObjectValue` | `default` (100%) | Returns JSON attachment |
+| `example-dark-mode` | boolean | `getBooleanDetails` | `on` (100%) | Toggles a dark/light card |
+| `example-greeting` | string | `getStringDetails` | `hello` (100%) | Maps variant to greeting text |
+| `example-items-per-page` | number | `getNumberDetails` | `25` (100%) | Controls skeleton row count |
+| `example-ui-config` | object | `getObjectDetails` | `default` (100%) | Returns JSON attachment |
 
 Change distributions in the [Flagr UI](http://localhost:18000) and refresh the page to see updated values.
 
@@ -42,8 +42,8 @@ src/
 ```
 
 - **Provider setup** happens once in `flags.ts` via `OpenFeature.setProvider()`.
-- **Flag evaluation** uses the standard OpenFeature client (`getBooleanValue`, `getStringValue`, etc.).
-- **Error handling**: A try/catch around `Promise.all` shows an error banner if Flagr is unreachable, with default values still displayed.
+- **Flag evaluation** uses the standard OpenFeature client (`getBooleanDetails`, `getStringDetails`, etc.).
+- **Error handling**: Each detail result is checked for `reason === 'ERROR'` to show an error banner if Flagr is unreachable, with default values still displayed.
 
 ## Configuration
 
