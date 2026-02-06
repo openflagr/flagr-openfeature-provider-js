@@ -15,6 +15,7 @@ jobs:
           node-version: '24'
           cache: 'npm'
       - run: npm ci
+      - run: npm ci --prefix examples/next-js-app-router-example
       - run: npm run lint
       - run: npm run format:check
 
@@ -27,6 +28,7 @@ jobs:
           node-version: '24'
           cache: 'npm'
       - run: npm ci
+      - run: npm ci --prefix examples/next-js-app-router-example
       - run: npm run typecheck
 
   unit_test:
@@ -38,7 +40,6 @@ jobs:
           node-version: '24'
           cache: 'npm'
       - run: npm ci
-      - run: npm ci --prefix examples/next-js-app-router-example
       - run: npm run test:coverage
       - uses: codecov/codecov-action@v4
         with:
