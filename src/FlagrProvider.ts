@@ -11,6 +11,7 @@ import {
 } from '@openfeature/server-sdk';
 import { FlagrProviderConfig } from './types/FlagrProviderConfig';
 import { evaluateFlag } from './evaluateFlag';
+import { FlagrBatchEvaluator } from './FlagrBatchEvaluator';
 
 /**
  * OpenFeature provider for Flagr feature flagging service.
@@ -49,6 +50,7 @@ export class FlagrProvider implements Provider {
   readonly events = new OpenFeatureEventEmitter();
 
   private readonly config: FlagrProviderConfig;
+  private readonly batchEvaluator: FlagrBatchEvaluator | null;
 
   /**
    * Creates a new FlagrProvider instance.
@@ -57,9 +59,22 @@ export class FlagrProvider implements Provider {
    * @param config.baseUrl - Base URL of the Flagr server (e.g., 'http://localhost:18000')
    * @param config.truthyVariants - Set of variant keys that should resolve to `true` for boolean evaluations (case-insensitive)
    * @param config.timeout - Optional request timeout in milliseconds (default: 5000ms for health check)
+   * @param config.batching - Optional batching configuration for coalescing concurrent evaluations
    */
   constructor(config: FlagrProviderConfig) {
     this.config = config;
+    this.batchEvaluator = config.batching?.enabled
+      ? new FlagrBatchEvaluator(config, {
+          maxBatchSize: config.batching.maxBatchSize,
+          scheduleFn: config.batching.scheduleFn,
+        })
+      : null;
+  }
+
+  private evaluateForFlag(flagKey: string, context: EvaluationContext, logger: Logger) {
+    return this.batchEvaluator
+      ? this.batchEvaluator.load(flagKey, context, logger)
+      : evaluateFlag(flagKey, context, this.config, logger);
   }
 
   /**
@@ -145,7 +160,7 @@ export class FlagrProvider implements Provider {
     logger: Logger
   ): Promise<ResolutionDetails<boolean>> {
     try {
-      const response = await evaluateFlag(flagKey, context, this.config, logger);
+      const response = await this.evaluateForFlag(flagKey, context, logger);
       logger.debug(`Flagr evaluation response: ${JSON.stringify(response)}`);
 
       // No segment matched - flag exists but no variant assigned
@@ -219,7 +234,7 @@ export class FlagrProvider implements Provider {
     logger: Logger
   ): Promise<ResolutionDetails<number>> {
     try {
-      const response = await evaluateFlag(flagKey, context, this.config, logger);
+      const response = await this.evaluateForFlag(flagKey, context, logger);
       logger.debug(`Flagr evaluation response: ${JSON.stringify(response)}`);
 
       // No segment matched - flag exists but no variant assigned
@@ -327,7 +342,7 @@ export class FlagrProvider implements Provider {
     logger: Logger
   ): Promise<ResolutionDetails<T>> {
     try {
-      const response = await evaluateFlag(flagKey, context, this.config, logger);
+      const response = await this.evaluateForFlag(flagKey, context, logger);
       logger.debug(`Flagr evaluation response: ${JSON.stringify(response)}`);
 
       // No segment matched - flag exists but no variant assigned
@@ -404,7 +419,7 @@ export class FlagrProvider implements Provider {
     logger: Logger
   ): Promise<ResolutionDetails<string>> {
     try {
-      const response = await evaluateFlag(flagKey, context, this.config, logger);
+      const response = await this.evaluateForFlag(flagKey, context, logger);
       logger.debug(`Flagr evaluation response: ${JSON.stringify(response)}`);
 
       // No segment matched - flag exists but no variant assigned

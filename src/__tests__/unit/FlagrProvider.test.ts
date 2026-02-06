@@ -18,6 +18,8 @@ import {
   createHealthCheckErrorHandler,
   createHealthCheckTimeoutHandler,
   createHealthCheckNetworkErrorHandler,
+  createBatchHandler,
+  createBatchServerErrorHandler,
 } from '../mocks/handlers';
 import { http, HttpResponse } from 'msw';
 
@@ -668,6 +670,148 @@ describe('FlagrProvider', () => {
 
       expect(result.value).toEqual({});
       expect(result.reason).toBe(StandardResolutionReasons.TARGETING_MATCH);
+    });
+  });
+
+  describe('with batching enabled', () => {
+    const batchConfig: FlagrProviderConfig = {
+      ...defaultConfig,
+      batching: { enabled: true },
+    };
+
+    it('should resolve boolean evaluation via batch endpoint', async () => {
+      server.use(
+        createHealthCheckHandler(),
+        createBatchHandler({ 'test-flag': { variantKey: 'on' } })
+      );
+
+      const provider = new FlagrProvider(batchConfig);
+
+      const result = await provider.resolveBooleanEvaluation(
+        'test-flag',
+        false,
+        { targetingKey: 'user-123' },
+        silentLogger
+      );
+
+      expect(result.value).toBe(true);
+      expect(result.reason).toBe(StandardResolutionReasons.TARGETING_MATCH);
+      expect(result.variant).toBe('on');
+    });
+
+    it('should resolve string evaluation via batch endpoint', async () => {
+      server.use(
+        createHealthCheckHandler(),
+        createBatchHandler({ 'test-flag': { variantKey: 'variant-a' } })
+      );
+
+      const provider = new FlagrProvider(batchConfig);
+
+      const result = await provider.resolveStringEvaluation(
+        'test-flag',
+        'default',
+        { targetingKey: 'user-123' },
+        silentLogger
+      );
+
+      expect(result.value).toBe('variant-a');
+      expect(result.reason).toBe(StandardResolutionReasons.TARGETING_MATCH);
+    });
+
+    it('should resolve number evaluation via batch endpoint', async () => {
+      server.use(
+        createHealthCheckHandler(),
+        createBatchHandler({ 'test-flag': { variantKey: '42' } })
+      );
+
+      const provider = new FlagrProvider(batchConfig);
+
+      const result = await provider.resolveNumberEvaluation(
+        'test-flag',
+        0,
+        { targetingKey: 'user-123' },
+        silentLogger
+      );
+
+      expect(result.value).toBe(42);
+      expect(result.reason).toBe(StandardResolutionReasons.TARGETING_MATCH);
+    });
+
+    it('should resolve object evaluation via batch endpoint', async () => {
+      const attachment = { theme: 'dark' };
+      server.use(
+        createHealthCheckHandler(),
+        createBatchHandler({ 'test-flag': { variantKey: 'v1', variantAttachment: attachment } })
+      );
+
+      const provider = new FlagrProvider(batchConfig);
+
+      const result = await provider.resolveObjectEvaluation(
+        'test-flag',
+        {},
+        { targetingKey: 'user-123' },
+        silentLogger
+      );
+
+      expect(result.value).toEqual(attachment);
+      expect(result.reason).toBe(StandardResolutionReasons.TARGETING_MATCH);
+    });
+
+    it('should return default value when no segment matches via batch', async () => {
+      server.use(
+        createHealthCheckHandler(),
+        createBatchHandler({ 'test-flag': { variantKey: undefined } })
+      );
+
+      const provider = new FlagrProvider(batchConfig);
+
+      const result = await provider.resolveBooleanEvaluation(
+        'test-flag',
+        true,
+        { targetingKey: 'user-123' },
+        silentLogger
+      );
+
+      expect(result.value).toBe(true);
+      expect(result.reason).toBe(StandardResolutionReasons.DEFAULT);
+    });
+
+    it('should return GENERAL error on batch server failure', async () => {
+      server.use(createHealthCheckHandler(), createBatchServerErrorHandler());
+
+      const provider = new FlagrProvider(batchConfig);
+
+      const result = await provider.resolveBooleanEvaluation(
+        'test-flag',
+        false,
+        { targetingKey: 'user-123' },
+        silentLogger
+      );
+
+      expect(result.value).toBe(false);
+      expect(result.reason).toBe(StandardResolutionReasons.ERROR);
+      expect(result.errorCode).toBe(ErrorCode.GENERAL);
+    });
+
+    it('should return FLAG_NOT_FOUND error for missing flag via batch', async () => {
+      server.use(
+        createHealthCheckHandler(),
+        createBatchHandler({ 'other-flag': { variantKey: 'on' } })
+      );
+
+      const provider = new FlagrProvider(batchConfig);
+
+      const result = await provider.resolveBooleanEvaluation(
+        'non-existent-flag',
+        false,
+        { targetingKey: 'user-123' },
+        silentLogger
+      );
+
+      expect(result.value).toBe(false);
+      expect(result.reason).toBe(StandardResolutionReasons.ERROR);
+      expect(result.errorCode).toBe(ErrorCode.FLAG_NOT_FOUND);
+      expect(result.errorMessage).toContain('not found');
     });
   });
 });

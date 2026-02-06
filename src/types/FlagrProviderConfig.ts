@@ -45,6 +45,18 @@ export const FlagrProviderConfig = z.object({
    * @default undefined (uses 5000ms for health checks)
    */
   timeout: z.number().optional(),
+
+  /**
+   * Optional batching configuration for coalescing concurrent flag evaluations
+   * into a single request to Flagr's `/api/v1/evaluation/batch` endpoint.
+   */
+  batching: z
+    .object({
+      enabled: z.boolean(),
+      maxBatchSize: z.number().min(1).optional(),
+      scheduleFn: z.custom<(fn: () => void) => void>().optional(),
+    })
+    .optional(),
 });
 
 /**

@@ -1,5 +1,6 @@
 import { http, HttpResponse, delay } from 'msw';
 import type { FlagrEvaluationResponse } from '../../types/flagr/evaluation/FlagrEvaluationResponse';
+import type { FlagrBatchEvaluationRequest } from '../../types/flagr/evaluation/FlagrBatchEvaluationRequest';
 
 const BASE_URL = 'http://localhost:18000';
 
@@ -168,5 +169,60 @@ export function createHealthCheckTimeoutHandler(delayMs: number, baseUrl = BASE_
 export function createHealthCheckNetworkErrorHandler(baseUrl = BASE_URL) {
   return http.get(`${baseUrl}/api/v1/health`, () => {
     return HttpResponse.error();
+  });
+}
+
+/**
+ * Handler for batch evaluation that returns results for given flag configurations.
+ * Each entry in flagResults maps a flagKey to its variant and optional attachment.
+ */
+export function createBatchHandler(
+  flagResults: Record<string, { variantKey?: string; variantAttachment?: Record<string, unknown> }>,
+  baseUrl = BASE_URL
+) {
+  return http.post(`${baseUrl}/api/v1/evaluation/batch`, async ({ request }) => {
+    const body = (await request.json()) as FlagrBatchEvaluationRequest;
+    const evaluationResults: FlagrEvaluationResponse[] = [];
+
+    for (const entity of body.entities) {
+      for (const flagKey of body.flagKeys ?? []) {
+        if (!(flagKey in flagResults)) continue;
+        const result = flagResults[flagKey];
+        evaluationResults.push(
+          createFlagrResponse({
+            flagKey,
+            variantKey: result.variantKey,
+            variantAttachment: result.variantAttachment,
+            variantID: result.variantKey ? 1 : undefined,
+            segmentID: result.variantKey ? 1 : undefined,
+            evalContext: {
+              entityID: entity.entityID,
+              entityType: entity.entityType ?? 'user',
+            },
+          })
+        );
+      }
+    }
+
+    return HttpResponse.json({ evaluationResults });
+  });
+}
+
+/**
+ * Handler for batch evaluation that returns a 500 server error.
+ */
+export function createBatchServerErrorHandler(baseUrl = BASE_URL) {
+  return http.post(`${baseUrl}/api/v1/evaluation/batch`, () => {
+    return new HttpResponse('Internal Server Error', { status: 500 });
+  });
+}
+
+/**
+ * Handler for batch evaluation that times out.
+ */
+export function createBatchTimeoutHandler(delayMs: number, baseUrl = BASE_URL) {
+  return http.post(`${baseUrl}/api/v1/evaluation/batch`, async () => {
+    await delay(delayMs);
+    return HttpResponse.json({ evaluationResults: [] });
   });
 }
