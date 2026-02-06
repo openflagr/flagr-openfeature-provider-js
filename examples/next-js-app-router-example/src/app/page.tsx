@@ -39,6 +39,7 @@ function FlagCard({
   );
 }
 
+/* eslint-disable @typescript-eslint/require-await */
 async function evaluateWithEntity(formData: FormData) {
   'use server';
   const entityId = (formData.get('entityId') as string | null) ?? '';
@@ -62,7 +63,7 @@ export default async function Home({
 
   const [darkModeDetails, greetingDetails, itemsPerPageDetails, uiConfigDetails] =
     await Promise.all([
-      client.getBooleanDetails('example-dark-mode', false, context),
+      client.getBooleanDetails('example-dark-mode', darkMode, context),
       client.getStringDetails('example-greeting', greeting, context),
       client.getNumberDetails('example-items-per-page', itemsPerPage, context),
       client.getObjectDetails<UiConfig>('example-ui-config', uiConfig, context),
