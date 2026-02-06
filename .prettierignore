@@ -4,6 +4,10 @@ node_modules/
 # Build outputs
 dist/
 coverage/
+.next/
+
+# Auto-generated files
+next-env.d.ts
 
 # Markdown files
 *.md

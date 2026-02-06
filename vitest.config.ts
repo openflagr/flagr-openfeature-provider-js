@@ -13,7 +13,7 @@ export default defineConfig(({ mode }) => {
         provider: 'v8',
         reporter: ['text', 'html', 'lcov'],
         include: ['src/**/*.ts'],
-        exclude: ['src/**/*.test.ts', 'src/__tests__/**'],
+        exclude: ['src/**/*.test.ts', 'src/__tests__/**', 'examples/**'],
       },
     },
   };
