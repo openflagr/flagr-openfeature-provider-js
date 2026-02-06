@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 :root {
   --background: #ffffff;
@@ -8,7 +8,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  /*noinspection CssUnresolvedCustomProperty*/
   --font-sans: var(--font-geist-sans);
+  /*noinspection CssUnresolvedCustomProperty*/
   --font-mono: var(--font-geist-mono);
 }
 
