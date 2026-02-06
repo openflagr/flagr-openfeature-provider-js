@@ -7,7 +7,6 @@ Demonstrates the Flagr OpenFeature provider in a Next.js App Router project. All
 ```bash
 # 1. Start Flagr and seed example flags
 docker compose -f examples/docker-compose.yml up -d
-./examples/seed-flags.sh
 
 # 2. Install dependencies (from this directory)
 npm install
