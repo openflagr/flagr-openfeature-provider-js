@@ -3,3 +3,19 @@ services:
     image: ghcr.io/openflagr/flagr
     ports:
       - "18000:18000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:18000/api/v1/health || exit 1"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+
+  flagr-seed:
+    image: alpine:3
+    depends_on:
+      flagr:
+        condition: service_healthy
+    volumes:
+      - ./seed-flags.sh:/seed-flags.sh:ro
+    environment:
+      - FLAGR_URL=http://flagr:18000
+    command: sh -c "apk add --no-cache bash curl jq >/dev/null 2>&1 && bash /seed-flags.sh"

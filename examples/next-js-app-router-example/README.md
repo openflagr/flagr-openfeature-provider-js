@@ -1,36 +1,54 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Next.js App Router Example — Flagr OpenFeature Provider
 
-## Getting Started
+Demonstrates the Flagr OpenFeature provider in a Next.js App Router project. All flag evaluations happen server-side in an async Server Component — no client components needed.
 
-First, run the development server:
+## Quick Start
 
 ```bash
+# 1. Start Flagr and seed example flags
+docker compose -f examples/docker-compose.yml up -d
+./examples/seed-flags.sh
+
+# 2. Install dependencies (from this directory)
+npm install
+
+# 3. Start the dev server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) to see the flag demo dashboard.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Example Flags
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The seed script creates four flags that cover every OpenFeature evaluation type:
 
-## Learn More
+| Flag Key | Type | Method | Default Variant | Description |
+|---|---|---|---|---|
+| `example-dark-mode` | boolean | `getBooleanValue` | `on` (100%) | Toggles a dark/light card |
+| `example-greeting` | string | `getStringValue` | `hello` (100%) | Maps variant to greeting text |
+| `example-items-per-page` | number | `getNumberValue` | `25` (100%) | Controls skeleton row count |
+| `example-ui-config` | object | `getObjectValue` | `default` (100%) | Returns JSON attachment |
 
-To learn more about Next.js, take a look at the following resources:
+Change distributions in the [Flagr UI](http://localhost:18000) and refresh the page to see updated values.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Architecture
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+src/
+  lib/flags.ts    — Configures OpenFeature with the FlagrProvider, exports getOpenFeatureClient()
+  app/
+    layout.tsx    — Root layout with metadata
+    page.tsx      — Async Server Component that evaluates flags and renders the dashboard
+```
 
-## Deploy on Vercel
+- **Provider setup** happens once in `flags.ts` via `OpenFeature.setProvider()`.
+- **Flag evaluation** uses the standard OpenFeature client (`getBooleanValue`, `getStringValue`, etc.).
+- **Error handling**: A try/catch around `Promise.all` shows an error banner if Flagr is unreachable, with default values still displayed.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Configuration
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The provider defaults to `http://localhost:18000` (matching the docker-compose setup). Override with:
+
+```bash
+FLAGR_URL=http://your-flagr-host:18000 npm run dev
+```

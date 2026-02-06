@@ -4,6 +4,48 @@ set -euo pipefail
 FLAGR_URL="${FLAGR_URL:-http://localhost:18000}"
 API="${FLAGR_URL}/api/v1"
 
+# --- flag definitions ---
+
+FLAGS_JSON=$(cat <<'EOF'
+[
+  {
+    "key": "example-dark-mode",
+    "description": "Example boolean flag for dark mode",
+    "variants": [
+      { "key": "on",  "percent": 50 },
+      { "key": "off", "percent": 50 }
+    ]
+  },
+  {
+    "key": "example-greeting",
+    "description": "Example string flag for greeting message",
+    "variants": [
+      { "key": "hello",     "percent": 60 },
+      { "key": "welcome",   "percent": 20 },
+      { "key": "hey-there", "percent": 20 }
+    ]
+  },
+  {
+    "key": "example-items-per-page",
+    "description": "Example number flag for items per page",
+    "variants": [
+      { "key": "10", "percent": 20 },
+      { "key": "25", "percent": 60 },
+      { "key": "50", "percent": 20 }
+    ]
+  },
+  {
+    "key": "example-ui-config",
+    "description": "Example object flag for UI configuration",
+    "variants": [
+      { "key": "default", "percent": 70, "attachment": {"theme":"light","showBanner":true,"maxItems":10} },
+      { "key": "compact", "percent": 30, "attachment": {"theme":"dark","showBanner":false,"maxItems":5} }
+    ]
+  }
+]
+EOF
+)
+
 # --- helpers ---
 
 wait_for_flagr() {
@@ -22,104 +64,178 @@ wait_for_flagr() {
   printf " ready!\n" >&2
 }
 
-# Extract a numeric id from a JSON response like {"id":42,...}
-extract_id() {
-  grep -o '"id":[0-9]*' | head -1 | grep -o '[0-9]*'
+# api_get URL — GET request, prints response body
+api_get() {
+  curl -s "$1"
 }
 
-# create_flag KEY DESCRIPTION
-# Prints the flag ID to stdout. Returns 0 on create, 1 if already exists.
-# All status messages go to stderr.
-create_flag() {
-  local key="$1"
-  local description="$2"
+# api_post URL DATA — POST request, prints response body
+# Returns 1 on 409 (conflict/already exists), exits on other errors
+api_post() {
+  local url="$1"
+  local data="$2"
+  local http_code response
 
-  local response
-  local http_code
   http_code=$(curl -s -o /tmp/flagr_response -w "%{http_code}" \
-    -X POST "${API}/flags" \
+    -X POST "$url" \
     -H "Content-Type: application/json" \
-    -d "{\"key\":\"${key}\",\"description\":\"${description}\"}")
+    -d "$data")
 
   response=$(cat /tmp/flagr_response)
 
   if [ "$http_code" = "409" ]; then
-    echo "  Flag '${key}' already exists — skipping" >&2
-    # Fetch the existing flag to get its ID
-    response=$(curl -s "${API}/flags" | grep -o "{[^}]*\"key\":\"${key}\"[^}]*}" | head -1)
-    echo "$response" | extract_id
+    echo "$response"
     return 1
   fi
 
   if [ "$http_code" != "200" ] && [ "$http_code" != "201" ]; then
-    echo "  ERROR creating flag '${key}': HTTP ${http_code}" >&2
+    echo "  ERROR: POST $url returned HTTP ${http_code}" >&2
     echo "  $response" >&2
     exit 1
   fi
 
-  echo "$response" | extract_id
+  echo "$response"
 }
 
-add_variant() {
+# api_put URL DATA — PUT request, prints response body
+api_put() {
+  local url="$1"
+  local data="$2"
+
+  curl -s -X PUT "$url" \
+    -H "Content-Type: application/json" \
+    -d "$data"
+}
+
+# ensure_flag KEY DESCRIPTION — creates or finds existing flag, prints flag ID
+ensure_flag() {
+  local key="$1"
+  local description="$2"
+
+  local body
+  body=$(jq -n --arg k "$key" --arg d "$description" '{key: $k, description: $d}')
+
+  local response
+  if response=$(api_post "${API}/flags" "$body"); then
+    echo "$response" | jq -r '.id'
+    return 0
+  fi
+
+  # 409 — flag already exists, look it up
+  echo "  Flag '${key}' already exists — skipping" >&2
+  api_get "${API}/flags" | jq --arg k "$key" '.[] | select(.key == $k) | .id'
+}
+
+# ensure_variant FLAG_ID VARIANT_KEY [ATTACHMENT_JSON]
+# Prints variant ID. Creates the variant if it doesn't exist.
+ensure_variant() {
   local flag_id="$1"
   local variant_key="$2"
   local attachment="${3:-}"
 
-  local body="{\"key\":\"${variant_key}\"}"
-  if [ -n "$attachment" ]; then
-    body="{\"key\":\"${variant_key}\",\"attachment\":${attachment}}"
+  # Check if variant already exists
+  local existing_id
+  existing_id=$(api_get "${API}/flags/${flag_id}" \
+    | jq --arg k "$variant_key" '.variants[] | select(.key == $k) | .id // empty')
+
+  if [ -n "$existing_id" ]; then
+    echo "$existing_id"
+    return 0
   fi
 
-  local response
-  response=$(curl -s -X POST "${API}/flags/${flag_id}/variants" \
-    -H "Content-Type: application/json" \
-    -d "$body")
+  local body
+  if [ -n "$attachment" ]; then
+    body=$(jq -n --arg k "$variant_key" --argjson a "$attachment" '{key: $k, attachment: $a}')
+  else
+    body=$(jq -n --arg k "$variant_key" '{key: $k}')
+  fi
 
-  echo "$response" | extract_id
+  api_post "${API}/flags/${flag_id}/variants" "$body" | jq -r '.id'
 }
 
-create_segment() {
+# ensure_segment FLAG_ID — prints segment ID, creates one if none exist
+ensure_segment() {
   local flag_id="$1"
-  local description="${2:-All users}"
 
-  local response
-  response=$(curl -s -X POST "${API}/flags/${flag_id}/segments" \
-    -H "Content-Type: application/json" \
-    -d "{\"description\":\"${description}\",\"rolloutPercent\":100}")
+  local existing_id
+  existing_id=$(api_get "${API}/flags/${flag_id}/segments" | jq '.[0].id // empty')
 
-  echo "$response" | extract_id
+  if [ -n "$existing_id" ]; then
+    echo "$existing_id"
+    return 0
+  fi
+
+  local body
+  body=$(jq -n '{description: "All users", rolloutPercent: 100}')
+
+  api_post "${API}/flags/${flag_id}/segments" "$body" | jq -r '.id'
 }
 
-set_distribution() {
+# set_distributions FLAG_ID SEGMENT_ID DISTRIBUTIONS_JSON
+# DISTRIBUTIONS_JSON is an array of {"variantID": N, "percent": N}
+set_distributions() {
   local flag_id="$1"
   local segment_id="$2"
-  shift 2
-  # Remaining args are pairs: variantID percent variantID percent ...
-  local distributions="["
-  local first=true
-  while [ $# -ge 2 ]; do
-    local vid="$1"
-    local pct="$2"
-    shift 2
-    if [ "$first" = true ]; then
-      first=false
-    else
-      distributions="${distributions},"
-    fi
-    distributions="${distributions}{\"variantID\":${vid},\"percent\":${pct}}"
-  done
-  distributions="${distributions}]"
+  local distributions="$3"
 
-  curl -s -X PUT "${API}/flags/${flag_id}/segments/${segment_id}/distributions" \
-    -H "Content-Type: application/json" \
-    -d "{\"distributions\":${distributions}}" > /dev/null
+  local body
+  body=$(jq -n --argjson d "$distributions" '{distributions: $d}')
+  api_put "${API}/flags/${flag_id}/segments/${segment_id}/distributions" "$body" > /dev/null
 }
 
+# enable_flag FLAG_ID — idempotent PUT
 enable_flag() {
   local flag_id="$1"
-  curl -s -X PUT "${API}/flags/${flag_id}/enabled" \
-    -H "Content-Type: application/json" \
-    -d '{"enabled":true}' > /dev/null
+  api_put "${API}/flags/${flag_id}/enabled" '{"enabled":true}' > /dev/null
+}
+
+# --- seed a single flag ---
+
+seed_flag() {
+  local index="$1"
+  local flag_json="$2"
+  local total="$3"
+
+  local key description
+  key=$(echo "$flag_json" | jq -r '.key')
+  description=$(echo "$flag_json" | jq -r '.description')
+
+  echo "[$(( index + 1 ))/${total}] ${key}" >&2
+
+  local flag_id
+  flag_id=$(ensure_flag "$key" "$description") || true
+
+  # Create variants and collect IDs paired with their percentages
+  local variant_count
+  variant_count=$(echo "$flag_json" | jq '.variants | length')
+
+  local distributions="[]"
+  local i=0
+  while [ "$i" -lt "$variant_count" ]; do
+    local variant
+    variant=$(echo "$flag_json" | jq -c ".variants[$i]")
+
+    local vkey percent attachment
+    vkey=$(echo "$variant" | jq -r '.key')
+    percent=$(echo "$variant" | jq '.percent')
+    attachment=$(echo "$variant" | jq -c '.attachment // empty')
+
+    local vid
+    vid=$(ensure_variant "$flag_id" "$vkey" "$attachment")
+
+    distributions=$(echo "$distributions" \
+      | jq --argjson vid "$vid" --argjson pct "$percent" --arg vk "$vkey" '. + [{"variantID": $vid, "variantKey": $vk, "percent": $pct}]')
+
+    i=$((i + 1))
+  done
+
+  local seg_id
+  seg_id=$(ensure_segment "$flag_id")
+
+  set_distributions "$flag_id" "$seg_id" "$distributions"
+  enable_flag "$flag_id"
+
+  echo "  Done! (flagID=${flag_id})" >&2
 }
 
 # --- main ---
@@ -130,51 +246,12 @@ echo "" >&2
 echo "Seeding example flags..." >&2
 echo "" >&2
 
-# ---- 1. example-dark-mode (boolean) ----
-echo "[1/4] example-dark-mode (boolean)" >&2
-if flag_id=$(create_flag "example-dark-mode" "Example boolean flag for dark mode"); then
-  v_on=$(add_variant "$flag_id" "on")
-  v_off=$(add_variant "$flag_id" "off")
-  seg_id=$(create_segment "$flag_id")
-  set_distribution "$flag_id" "$seg_id" "$v_on" 100 "$v_off" 0
-  enable_flag "$flag_id"
-  echo "  Created! (flagID=${flag_id})" >&2
-fi
-
-# ---- 2. example-greeting (string) ----
-echo "[2/4] example-greeting (string)" >&2
-if flag_id=$(create_flag "example-greeting" "Example string flag for greeting message"); then
-  v_hello=$(add_variant "$flag_id" "hello")
-  v_welcome=$(add_variant "$flag_id" "welcome")
-  v_hey=$(add_variant "$flag_id" "hey-there")
-  seg_id=$(create_segment "$flag_id")
-  set_distribution "$flag_id" "$seg_id" "$v_hello" 100 "$v_welcome" 0 "$v_hey" 0
-  enable_flag "$flag_id"
-  echo "  Created! (flagID=${flag_id})" >&2
-fi
-
-# ---- 3. example-items-per-page (number) ----
-echo "[3/4] example-items-per-page (number)" >&2
-if flag_id=$(create_flag "example-items-per-page" "Example number flag for items per page"); then
-  v_10=$(add_variant "$flag_id" "10")
-  v_25=$(add_variant "$flag_id" "25")
-  v_50=$(add_variant "$flag_id" "50")
-  seg_id=$(create_segment "$flag_id")
-  set_distribution "$flag_id" "$seg_id" "$v_10" 0 "$v_25" 100 "$v_50" 0
-  enable_flag "$flag_id"
-  echo "  Created! (flagID=${flag_id})" >&2
-fi
-
-# ---- 4. example-ui-config (object) ----
-echo "[4/4] example-ui-config (object)" >&2
-if flag_id=$(create_flag "example-ui-config" "Example object flag for UI configuration"); then
-  v_default=$(add_variant "$flag_id" "default" '{"theme":"light","showBanner":true,"maxItems":10}')
-  v_compact=$(add_variant "$flag_id" "compact" '{"theme":"dark","showBanner":false,"maxItems":5}')
-  seg_id=$(create_segment "$flag_id")
-  set_distribution "$flag_id" "$seg_id" "$v_default" 100 "$v_compact" 0
-  enable_flag "$flag_id"
-  echo "  Created! (flagID=${flag_id})" >&2
-fi
+total=$(echo "$FLAGS_JSON" | jq 'length')
+index=0
+while [ "$index" -lt "$total" ]; do
+  seed_flag "$index" "$(echo "$FLAGS_JSON" | jq -c ".[$index]")" "$total"
+  index=$((index + 1))
+done
 
 echo "" >&2
 echo "Done! All example flags are seeded." >&2
@@ -184,4 +261,4 @@ echo "" >&2
 echo "Quick test:" >&2
 echo "  curl -s -X POST ${API}/evaluation \\" >&2
 echo '    -H "Content-Type: application/json" \' >&2
-echo '    -d '\''{"flagKey":"example-dark-mode","entityID":"test"}'\'' | grep variantKey' >&2
+echo '    -d '\''{"flagKey":"example-dark-mode","entityID":"test"}'\'' | jq .variantKey' >&2
