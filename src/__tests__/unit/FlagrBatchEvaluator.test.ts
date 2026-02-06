@@ -55,11 +55,7 @@ describe('FlagrBatchEvaluator', () => {
 
     const evaluator = new FlagrBatchEvaluator(defaultConfig);
 
-    const result = await evaluator.load(
-      'test-flag',
-      { targetingKey: 'user-123' },
-      silentLogger
-    );
+    const result = await evaluator.load('test-flag', { targetingKey: 'user-123' }, silentLogger);
 
     expect(result).not.toBeNull();
     expect(result?.variantKey).toBe('on');
@@ -166,11 +162,7 @@ describe('FlagrBatchEvaluator', () => {
       { targetingKey: 'user-1' },
       silentLogger
     );
-    const missingPromise = evaluator.load(
-      'missing-flag',
-      { targetingKey: 'user-1' },
-      silentLogger
-    );
+    const missingPromise = evaluator.load('missing-flag', { targetingKey: 'user-1' }, silentLogger);
 
     const existing = await existingPromise;
     expect(existing?.variantKey).toBe('on');
@@ -185,11 +177,7 @@ describe('FlagrBatchEvaluator', () => {
 
     const evaluator = new FlagrBatchEvaluator(defaultConfig);
 
-    const result = await evaluator.load(
-      'test-flag',
-      { targetingKey: 'user-1' },
-      silentLogger
-    );
+    const result = await evaluator.load('test-flag', { targetingKey: 'user-1' }, silentLogger);
 
     expect(result).toBeNull();
   });
@@ -199,16 +187,8 @@ describe('FlagrBatchEvaluator', () => {
 
     const evaluator = new FlagrBatchEvaluator({ ...defaultConfig, timeout: 50 });
 
-    const promise1 = evaluator.load(
-      'flag-a',
-      { targetingKey: 'user-1' },
-      silentLogger
-    );
-    const promise2 = evaluator.load(
-      'flag-b',
-      { targetingKey: 'user-1' },
-      silentLogger
-    );
+    const promise1 = evaluator.load('flag-a', { targetingKey: 'user-1' }, silentLogger);
+    const promise2 = evaluator.load('flag-b', { targetingKey: 'user-1' }, silentLogger);
 
     await expect(promise1).rejects.toThrow(GeneralError);
     await expect(promise2).rejects.toThrow(GeneralError);
@@ -219,16 +199,8 @@ describe('FlagrBatchEvaluator', () => {
 
     const evaluator = new FlagrBatchEvaluator(defaultConfig);
 
-    const promise1 = evaluator.load(
-      'flag-a',
-      { targetingKey: 'user-1' },
-      silentLogger
-    );
-    const promise2 = evaluator.load(
-      'flag-b',
-      { targetingKey: 'user-1' },
-      silentLogger
-    );
+    const promise1 = evaluator.load('flag-a', { targetingKey: 'user-1' }, silentLogger);
+    const promise2 = evaluator.load('flag-b', { targetingKey: 'user-1' }, silentLogger);
 
     await expect(promise1).rejects.toThrow(GeneralError);
     await expect(promise2).rejects.toThrow(GeneralError);
