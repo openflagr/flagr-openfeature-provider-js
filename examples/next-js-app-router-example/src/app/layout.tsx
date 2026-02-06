@@ -14,7 +14,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Flagr OpenFeature Provider — Next.js Example",
-  description: "Demonstrates the Flagr OpenFeature provider with boolean, string, number, and object flag evaluations.",
+  description:
+    "Demonstrates the Flagr OpenFeature provider with boolean, string, number, and object flag evaluations.",
 };
 
 export default function RootLayout({
