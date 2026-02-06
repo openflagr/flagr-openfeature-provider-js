@@ -33,6 +33,7 @@ const isEnabled = await client.getBooleanValue('my-feature', false, {
 | `baseUrl`        | `string`      | Yes      | -       | Base URL of the Flagr server (e.g., `http://localhost:18000`)                  |
 | `truthyVariants` | `Set<string>` | Yes      | -       | Variant keys that resolve to `true` for boolean evaluations (case-insensitive) |
 | `timeout`        | `number`      | No       | `5000`  | Request timeout in milliseconds                                                |
+| `batching`       | `object`      | No       | -       | Batch evaluation configuration (see [Batch Evaluation](#batch-evaluation))     |
 
 ## Evaluation Methods
 
@@ -167,6 +168,64 @@ const details = await client.getBooleanDetails('my-flag', false);
 console.log(details.flagMetadata?.segmentID);
 ```
 
+## Batch Evaluation
+
+When evaluating multiple flags for the same user in a single request (common in Next.js server components), each `resolve*Evaluation()` call makes an individual HTTP request. Batch evaluation coalesces these into a single `POST` to Flagr's `/api/v1/evaluation/batch` endpoint.
+
+### Enabling Batching
+
+```typescript
+OpenFeature.setProvider(
+  new FlagrProvider({
+    baseUrl: 'http://localhost:18000',
+    truthyVariants: new Set(['on', 'true', 'enabled']),
+    batching: { enabled: true },
+  })
+);
+```
+
+No changes to evaluation calls are needed — the provider automatically collects individual evaluations within the same microtask tick and sends them as a single batch request.
+
+```typescript
+const client = OpenFeature.getClient();
+
+// These three calls are coalesced into one HTTP request
+const [showBanner, variant, limit] = await Promise.all([
+  client.getBooleanValue('show-banner', false, { targetingKey: 'user-123' }),
+  client.getStringValue('experiment', 'control', { targetingKey: 'user-123' }),
+  client.getNumberValue('rate-limit', 100, { targetingKey: 'user-123' }),
+]);
+```
+
+### Batching Options
+
+| Option         | Type       | Default          | Description                                                |
+| -------------- | ---------- | ---------------- | ---------------------------------------------------------- |
+| `enabled`      | `boolean`  | -                | Enable batch evaluation                                    |
+| `maxBatchSize` | `number`   | `50`             | Max flag keys per batch request (splits into multiple requests if exceeded) |
+| `scheduleFn`   | `function` | `queueMicrotask` | Custom scheduling function for flushing the batch          |
+
+```typescript
+batching: {
+  enabled: true,
+  maxBatchSize: 25,
+  scheduleFn: (fn) => setTimeout(fn, 10), // flush after 10ms instead of microtask
+}
+```
+
+### How It Works
+
+1. Individual `resolve*Evaluation()` calls are queued instead of making HTTP requests
+2. At the end of the current microtask (or custom schedule), all queued evaluations are flushed
+3. Evaluations for the same entity (same `targetingKey` + context) are deduplicated into a single entity entry
+4. Unique flag keys are collected and sent as one batch request
+5. Results are mapped back to the original promises
+
+### Error Handling
+
+- If the batch HTTP request fails, all pending promises reject with `GeneralError`
+- If a specific flag is missing from the batch response, that promise rejects with `FlagNotFoundError` (same as the single evaluation path returning a 404)
+
 ## Provider Lifecycle
 
 ### Initialisation
@@ -252,4 +311,4 @@ export default async function Page() {
 - **Server-only**: This provider uses remote evaluation (HTTP calls), making it unsuitable for client-side usage
 - **No push updates**: Flagr doesn't provide webhooks for flag changes, so `PROVIDER_CONFIGURATION_CHANGED` events are not emitted
 - **Edge Runtime**: Not compatible with Edge Runtime (requires Node.js HTTP)
-- **No Batch Evaluation**: OpenFeature doesn't support batch evaluation. This is something I want to add within the provider initialiser
+- **Batch window**: Batching coalesces calls within a single microtask tick — calls across separate ticks produce separate HTTP requests
