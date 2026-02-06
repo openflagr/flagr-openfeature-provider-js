@@ -1,0 +1,5 @@
+services:
+  flagr:
+    image: ghcr.io/openflagr/flagr
+    ports:
+      - "18000:18000"
